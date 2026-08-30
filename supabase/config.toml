@@ -1,0 +1,2 @@
+[functions.portfolio-media-url]
+verify_jwt = false

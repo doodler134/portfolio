@@ -1,6 +1,7 @@
--- Doodle Portfolio: Supabase setup
+-- Doodle Portfolio: secure Supabase setup
 -- Run this once in Supabase SQL Editor.
--- IMPORTANT: do NOT put a service_role key into the website.
+-- This version keeps Storage PRIVATE. Public visitors never get a public Storage URL.
+-- The website uses the Edge Function in supabase/functions/portfolio-media-url to issue short-lived signed URLs.
 
 create table if not exists public.portfolio_state (
   id bigint primary key default 1 check (id = 1),
@@ -38,19 +39,28 @@ to authenticated
 using (auth.uid() = owner_id)
 with check (auth.uid() = owner_id);
 
--- Create the bucket. It is public for portfolio viewing, but writes are restricted.
+-- PRIVATE bucket: direct /storage/v1/object/public/... URLs will not work.
 insert into storage.buckets (id, name, public)
-values ('portfolio-media', 'portfolio-media', true)
-on conflict (id) do update set public = true;
+values ('portfolio-media', 'portfolio-media', false)
+on conflict (id) do update set public = false;
 
+-- Remove any old public-read policy from the previous version.
 drop policy if exists "Public can read portfolio media" on storage.objects;
-create policy "Public can read portfolio media"
+drop policy if exists "Owner can read portfolio media" on storage.objects;
+drop policy if exists "Owner can upload portfolio media" on storage.objects;
+drop policy if exists "Owner can update portfolio media" on storage.objects;
+drop policy if exists "Owner can delete portfolio media" on storage.objects;
+
+-- Only the owner can directly read/list the files. Public visitors receive short-lived signed URLs from the Edge Function.
+create policy "Owner can read portfolio media"
 on storage.objects
 for select
-to public
-using (bucket_id = 'portfolio-media');
+to authenticated
+using (
+  bucket_id = 'portfolio-media'
+  and (storage.foldername(name))[1] = auth.uid()::text
+);
 
-drop policy if exists "Owner can upload portfolio media" on storage.objects;
 create policy "Owner can upload portfolio media"
 on storage.objects
 for insert
@@ -60,7 +70,6 @@ with check (
   and (storage.foldername(name))[1] = auth.uid()::text
 );
 
-drop policy if exists "Owner can update portfolio media" on storage.objects;
 create policy "Owner can update portfolio media"
 on storage.objects
 for update
@@ -74,7 +83,6 @@ with check (
   and (storage.foldername(name))[1] = auth.uid()::text
 );
 
-drop policy if exists "Owner can delete portfolio media" on storage.objects;
 create policy "Owner can delete portfolio media"
 on storage.objects
 for delete
