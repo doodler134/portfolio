@@ -1,0 +1,5 @@
+window.PORTFOLIO_CONFIG = {
+  SUPABASE_URL: 'https://YOUR-PROJECT.supabase.co',
+  SUPABASE_PUBLISHABLE_KEY: 'YOUR-PUBLISHABLE-KEY',
+  STORAGE_BUCKET: 'portfolio-media'
+};
